@@ -1,47 +1,20 @@
 import json
 import time
 
-from selenium import webdriver
+import chrome
 
 
 def main():
     secret = json.loads(open('secret.json').read())
 
-    options = webdriver.ChromeOptions()
-    options.add_argument('user-data-dir={}'.format(secret['CHROME']['USER-DATA-DIR']))
-    options.add_argument('profile-directory=Default')
-
-    if secret['CHROME']['HEADLESS']:
-        options.add_argument('disable-extensions')
-        options.add_argument('disable-popup-blocking')
-        options.add_argument('headless')
-        options.add_argument('disable-gpu')
-        options.add_argument('no-sandbox')
-        options.add_argument('window-size=1920x1080')
-
-    options.add_experimental_option('prefs', {
-        'download.default_directory': secret['CHROME']['DOWNLOAD-DIR'],
-        'download.prompt_for_download': False,
-        'download.directory_upgrade': True,
-    })
-
-    driver = webdriver.Chrome(executable_path=secret['CHROME']['DRIVER'], options=options)
-
-    if secret['CHROME']['HEADLESS']:
-        driver.command_executor._commands['send_command'] \
-            = ('POST', '/session/$sessionId/chromium/send_command')
-        driver.execute('send_command', {
-            'cmd': 'Page.setDownloadBehavior',
-            'params': {
-                'behavior': 'allow',
-                'downloadPath': secret['CHROME']['DOWNLOAD-DIR']
-            }
-        })
-
+    # 1. Selenium 브라우저를 띄운다.
+    browser = chrome.Browser(secret)
+    driver = browser.driver
     driver.implicitly_wait(3)
 
     driver.get(secret['BANK']['KB']['URL'])
 
+    # 2. 생성된 세션값, 쿠키값 등 헤더 구성을 위한 데이터를 읽는다.
     jsessionid = ''
     qsid = ''
 
@@ -61,11 +34,15 @@ def main():
     print(quics_img)
     print(area_list)
 
+    # 3. 가상키보드 이미지 매칭으로 비밀번호를 해싱한다.
+
+    # 4. 헤더와 폼 데이터를 구성하여 requests 객체로 post 메소드 전송한다.
+
+    # 5. HTML 결과를 알맞게 파싱한다.
+
     time.sleep(3)
 
-    driver.close()
-
-    driver.quit()
+    browser.terminate()
 
 
 if __name__ == '__main__':
