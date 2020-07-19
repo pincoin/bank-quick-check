@@ -17,6 +17,8 @@ CURRENT_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def rmsdiff(im1, im2):
+    # 제곱평제곱근(root mean square)을 이용한 이미지 비교 함수
+    # 차이가 0이면 완전 일치, n 오차까지는 동일한 것으로 간주
     h = ImageChops.difference(im1, im2).histogram()
     return math.sqrt(reduce(operator.add,
                             map(lambda h, i: h * (i ** 2), h, range(256))
@@ -50,37 +52,37 @@ def main():
     keypad_useyn = driver.find_element_by_css_selector('input[id*="KEYPAD_USEYN"]').get_attribute('value')
 
     # 2-4. 가상 키패드 이미지 객체 구하기
-    quics_img = driver.find_element_by_css_selector('img[src*="quics"]')
+    quics_img_element = driver.find_element_by_css_selector('img[src*="quics"]')
 
     # 2-5. 키맵 난수 해시값 구하기 eb51535f24ac - keypad_useyn의 뒤에 붙는 값과 일치
-    keymap = quics_img.get_attribute('usemap').replace('#divKeypad', '')[:-3]
+    keymap = quics_img_element.get_attribute('usemap').replace('#divKeypad', '')[:-3]
 
     # 2-6. 가상 키패드 이미지는 총 14개 영역(area)
-    area_list = driver.find_elements_by_css_selector('map > area')
+    area_elements = driver.find_elements_by_css_selector('map > area')
 
     area_hash_list = []
 
     # 2-7. 자바스크립트 메소드에서 hide, cls, del 외에 put(해시문자열) 10개 구하기
     area_pattern = re.compile(r"'(\w+)'")
 
-    for area in area_list:
+    for area in area_elements:
         re_matched = area_pattern.findall(area.get_attribute('onmousedown'))
         if re_matched:
             area_hash_list.append(re_matched[0])
 
     # 2-8. 가상 키패드 이미지 실제로 다운로드
-    driver.get(quics_img.get_attribute('src'))
+    driver.get(quics_img_element.get_attribute('src'))
 
-    # 2-9. 셀레늄 크롬 브라우저 통해 이미지 열기 시뮬레이션 하므로 다시 img 태그 가져오기
-    img_tag = driver.find_element_by_tag_name('img')
+    # 2-9. 셀레늄 크롬 브라우저는 HTML 문서를 불러와 중첩된 img 태그로 이미지 표시
+    keypad_img_element = driver.find_element_by_tag_name('img')
 
     # 2-10. 전체 스크린샷에서 가상키보드 이미지 잘라내기
     screenshot = Image.open(BytesIO(driver.get_screenshot_as_png()))
     keypad = screenshot.crop(box=(
-        img_tag.location['x'],
-        img_tag.location['y'],
-        img_tag.location['x'] + img_tag.size['width'],
-        img_tag.location['y'] + img_tag.size['height'],
+        keypad_img_element.location['x'],
+        keypad_img_element.location['y'],
+        keypad_img_element.location['x'] + keypad_img_element.size['width'],
+        keypad_img_element.location['y'] + keypad_img_element.size['height'],
     ))
     # keypad.save('keypad.png')
 
