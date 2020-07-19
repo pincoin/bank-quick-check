@@ -1,30 +1,17 @@
 import datetime
 import json
-import math
-import operator
 import os
 import re
-from functools import reduce
 from io import BytesIO
 
 import requests
-from PIL import (
-    Image, ImageChops
-)
+from PIL import Image
 from bs4 import BeautifulSoup as bs
 
 import chrome
+import helpers
 
-CURRENT_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def rmsdiff(im1, im2):
-    # 제곱평제곱근(root mean square)을 이용한 이미지 비교 함수
-    # 차이가 0이면 완전 일치, n 오차까지는 동일한 것으로 간주
-    h = ImageChops.difference(im1, im2).histogram()
-    return math.sqrt(reduce(operator.add,
-                            map(lambda h, i: h * (i ** 2), h, range(256))
-                            ) / (float(im1.size[0]) * im1.size[1]))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def main():
@@ -102,11 +89,11 @@ def main():
     # 4. 키패드 이미지 매칭으로 비밀번호 해시 구하기
 
     # 57x57 박스 이미지
-    box_5th = Image.open(os.path.join(CURRENT_PACKAGE_DIR, 'assets', 'kbstar', '5.png'))
-    box_7th = Image.open(os.path.join(CURRENT_PACKAGE_DIR, 'assets', 'kbstar', '7.png'))
-    box_8th = Image.open(os.path.join(CURRENT_PACKAGE_DIR, 'assets', 'kbstar', '8.png'))
-    box_9th = Image.open(os.path.join(CURRENT_PACKAGE_DIR, 'assets', 'kbstar', '9.png'))
-    box_0th = Image.open(os.path.join(CURRENT_PACKAGE_DIR, 'assets', 'kbstar', '0.png'))
+    box_5th = Image.open(os.path.join(BASE_DIR, 'assets', 'kbstar', '5.png'))
+    box_7th = Image.open(os.path.join(BASE_DIR, 'assets', 'kbstar', '7.png'))
+    box_8th = Image.open(os.path.join(BASE_DIR, 'assets', 'kbstar', '8.png'))
+    box_9th = Image.open(os.path.join(BASE_DIR, 'assets', 'kbstar', '9.png'))
+    box_0th = Image.open(os.path.join(BASE_DIR, 'assets', 'kbstar', '0.png'))
 
     box_dict = {
         5: box_5th,
@@ -131,7 +118,7 @@ def main():
     for idx, crop in enumerate(crop_list):
         for key, box in box_dict.items():
             try:
-                diff = rmsdiff(crop, box)
+                diff = helpers.rmsdiff(crop, box)
                 if diff < 13:
                     keypad_num_list += [key]
             except Exception as e:
