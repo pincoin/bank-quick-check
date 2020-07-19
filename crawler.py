@@ -1,15 +1,17 @@
+import datetime
 import json
 import math
 import operator
 import os
 import re
-import time
 from functools import reduce
 from io import BytesIO
 
+import requests
 from PIL import (
     Image, ImageChops
 )
+from bs4 import BeautifulSoup as bs
 
 import chrome
 
@@ -73,10 +75,10 @@ def main():
     # 2-8. 가상 키패드 이미지 실제로 다운로드
     driver.get(quics_img_element.get_attribute('src'))
 
-    # 2-9. 셀레늄 크롬 브라우저는 HTML 문서를 불러와 중첩된 img 태그로 이미지 표시
+    # 2-9. 셀레늄 크롬 브라우저는 이미지 다운로드 해도 HTML 문서 형태로 불러옴
     keypad_img_element = driver.find_element_by_tag_name('img')
 
-    # 2-10. 전체 스크린샷에서 가상키보드 이미지 잘라내기
+    # 2-10. 브라우저 크기 스크린샷에서 가상키보드 이미지 잘라내기
     screenshot = Image.open(BytesIO(driver.get_screenshot_as_png()))
     keypad = screenshot.crop(box=(
         keypad_img_element.location['x'],
@@ -138,41 +140,126 @@ def main():
     # 키패드 실제 순서
     print(keypad_num_list)
 
-    PW_DIGITS = {}
+    keypad_dict = {}
     # 고정값
-    PW_DIGITS['1'] = area_hash_list[0]
-    PW_DIGITS['2'] = area_hash_list[1]
-    PW_DIGITS['3'] = area_hash_list[2]
-    PW_DIGITS['4'] = area_hash_list[3]
-    PW_DIGITS['6'] = area_hash_list[5]
+    keypad_dict['1'] = area_hash_list[0]
+    keypad_dict['2'] = area_hash_list[1]
+    keypad_dict['3'] = area_hash_list[2]
+    keypad_dict['4'] = area_hash_list[3]
+    keypad_dict['6'] = area_hash_list[5]
 
     # 변동값
     for idx, num in enumerate(keypad_num_list):
         if idx == 0:
-            PW_DIGITS[str(num)] = area_hash_list[4]
+            keypad_dict[str(num)] = area_hash_list[4]
         elif idx == 1:
-            PW_DIGITS[str(num)] = area_hash_list[6]
+            keypad_dict[str(num)] = area_hash_list[6]
         elif idx == 2:
-            PW_DIGITS[str(num)] = area_hash_list[7]
+            keypad_dict[str(num)] = area_hash_list[7]
         elif idx == 3:
-            PW_DIGITS[str(num)] = area_hash_list[8]
+            keypad_dict[str(num)] = area_hash_list[8]
         elif idx == 4:
-            PW_DIGITS[str(num)] = area_hash_list[9]
+            keypad_dict[str(num)] = area_hash_list[9]
 
-    for k, v in PW_DIGITS.items():
+    for k, v in keypad_dict.items():
         print(k, v)
 
     hashed_password = ''
     for p in secret['BANK']['KB']['PASSWORD']:
-        hashed_password += PW_DIGITS[p]
+        hashed_password += keypad_dict[p]
 
     print(hashed_password)
 
-    # 5. Send post method 헤더와 폼 데이터를 구성하여 requests 객체로 post 메소드 전송한다.
+    # 5. 헤더와 폼 데이터를 구성하여 requests 객체로 post 메소드 전송한다.
 
-    # 6. Parses HTML response appropriately
+    today = datetime.datetime.today()
+    this_year = today.strftime('%Y')
+    this_month = today.strftime('%m')
+    this_day = today.strftime('%d')
+    this_all = today.strftime('%Y%m%d')
 
-    time.sleep(0)
+    month_before = today - datetime.timedelta(days=1)
+
+    month_before_year = month_before.strftime('%Y')
+    month_before_month = month_before.strftime('%m')
+    month_before_day = month_before.strftime('%d')
+    month_before_all = month_before.strftime('%Y%m%d')
+
+    cookies = {
+        '_KB_N_TIKER': 'N',
+        'JSESSIONID': jsessionid,
+        'QSID': qsid,
+        'delfino.recentModule': 'G3',
+    }
+
+    headers = {
+        'Pragma': 'no-cache',
+        'Origin': 'https://obank.kbstar.com',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Accept-Language': 'ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4,la;q=0.2,da;q=0.2',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) '
+                      'AppleWebKit/537.36 (KHTML, like Gecko) '
+                      'Chrome/61.0.3163.79 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded;  charset=UTF-8',
+        'Accept': 'text/html, */*; q=0.01',
+        'Cache-Control': 'no-cache',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Connection': 'keep-alive',
+        'Referer': 'https://obank.kbstar.com/quics?page=C025255&cc=b028364:b028702&QSL=F',
+        'DNT': '1',
+    }
+
+    params = (
+        ('chgCompId', 'b028770'),
+        ('baseCompId', 'b028702'),
+        ('page', 'C025255'),
+        ('cc', 'b028702:b028770'),
+    )
+
+    data = [
+        # http://koreanstudies.com/unicode-converter.html
+        ('KEYPAD_TYPE_{}'.format(keymap), '3'),
+        ('KEYPAD_HASH_{}'.format(keymap), hashed_password),
+        ('KEYPAD_USEYN_{}'.format(keymap), keypad_useyn),
+        ('KEYPAD_INPUT_{}'.format(keymap), '\uBE44\uBC00\uBC88\uD638'),  # '비밀번호'
+        ('signed_msg', ''),
+        ('\uC694\uCCAD\uD0A4', ''),  # 요청키
+        ('\uACC4\uC88C\uBC88\uD638', secret['BANK']['KB']['ACCOUNT']),  # '계좌번호' (숫자만)
+        ('\uC870\uD68C\uC2DC\uC791\uC77C\uC790', month_before_all),  # '조회시작일자' (20201123)
+        ('\uC870\uD68C\uC885\uB8CC\uC77C', this_all),  # '조회종료일' (20201123)
+        ('\uACE0\uAC1D\uC2DD\uBCC4\uBC88\uD638', secret['BANK']['KB']['ID']),  # '고객식별번호' (인터넷뱅킹 ID) 개인은 빈문자열
+        ('\uBE60\uB978\uC870\uD68C', 'Y'),  # '빠른조회'
+        ('\uC870\uD68C\uACC4\uC88C', secret['BANK']['KB']['ACCOUNT']),  # '조회계좌'
+        ('\uBE44\uBC00\uBC88\uD638', secret['BANK']['KB']['PASSWORD']),  # '비밀번호'
+        ('USEYN_CHECK_NAME_{}'.format(keymap), 'Y'),
+        ('\uAC80\uC0C9\uAD6C\uBD84', '2'),  # '검색구분'
+        # ('\uC8FC\uBBFC\uC0AC\uC5C5\uC790\uBC88\uD638', birthday), # '주민사업자번호' (개인/개인사업자)
+        ('\uace0\uac1d\u0049\u0044', secret['BANK']['KB']['ID']),  # '고객ID' (법인 인터넷뱅킹 ID)
+        ('\uC870\uD68C\uC2DC\uC791\uB144', month_before_year),  # '조회시작년' (2020)
+        ('\uC870\uD68C\uC2DC\uC791\uC6D4', month_before_month),  # '조회시작월' (11)
+        ('\uC870\uD68C\uC2DC\uC791\uC77C', month_before_day),  # '조회시작일' (23)
+        ('\uC870\uD68C\uB05D\uB144', this_year),  # '조회끝년' (2020)
+        ('\uC870\uD68C\uB05D\uC6D4', this_month),  # '조회끝월' (11)
+        ('\uC870\uD68C\uB05D\uC77C', this_day),  # '조회끝일' (23)
+        ('\uC870\uD68C\uAD6C\uBD84', '2'),  # '조회구분'
+        ('\uC751\uB2F5\uBC29\uBC95', '2'),  # '응답방법'
+    ]
+
+    print(headers)
+    print(params)
+    print(cookies)
+    print(data)
+
+    r = requests.post('https://obank.kbstar.com/quics', headers=headers, params=params, cookies=cookies, data=data)
+
+    # 6. HTML 응답 결과를 알맞게 파싱
+    soup = bs(r.text, 'html.parser')
+
+    transactions = soup.select('#pop_contents > table.tType01 > tbody > tr')
+
+    transaction_list = []
+
+    print(transactions)
 
 
 if __name__ == '__main__':
